@@ -1,8 +1,10 @@
 ﻿using System;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Ray.BiliBiliTool.Agent.BiliBiliAgent.Dtos;
 using Ray.BiliBiliTool.Application.Attributes;
 using Ray.BiliBiliTool.Application.Contracts;
+using Ray.BiliBiliTool.Config.Options;
 using Ray.BiliBiliTool.DomainService.Interfaces;
 
 namespace Ray.BiliBiliTool.Application
@@ -12,32 +14,44 @@ namespace Ray.BiliBiliTool.Application
         private readonly ILogger<DailyTaskAppService> _logger;
         private readonly IAccountDomainService _loginDomainService;
         private readonly IVideoDomainService _videoDomainService;
+        private readonly IDonateCoinDomainService _donateCoinDomainService;
         private readonly IMangaDomainService _mangaDomainService;
         private readonly ILiveDomainService _liveDomainService;
         private readonly IVipPrivilegeDomainService _vipPrivilegeDomainService;
         private readonly IChargeDomainService _chargeDomainService;
+        private readonly SecurityOptions _securityOptions;
 
         public DailyTaskAppService(
             ILogger<DailyTaskAppService> logger,
             IAccountDomainService loginDomainService,
             IVideoDomainService videoDomainService,
+            IDonateCoinDomainService donateCoinDomainService,
             IMangaDomainService mangaDomainService,
             ILiveDomainService liveDomainService,
             IVipPrivilegeDomainService vipPrivilegeDomainService,
-            IChargeDomainService chargeDomainService)
+            IChargeDomainService chargeDomainService,
+            IOptionsMonitor<SecurityOptions> securityOptions)
         {
             _logger = logger;
             _loginDomainService = loginDomainService;
             _videoDomainService = videoDomainService;
+            _donateCoinDomainService = donateCoinDomainService;
             _mangaDomainService = mangaDomainService;
             _liveDomainService = liveDomainService;
             _vipPrivilegeDomainService = vipPrivilegeDomainService;
             _chargeDomainService = chargeDomainService;
+            _securityOptions = securityOptions.CurrentValue;
         }
 
         public void DoDailyTask()
         {
-            _logger.LogInformation("-----开始每日任务-----\r\n");
+            if (_securityOptions.IsSkipDailyTask)
+            {
+                _logger.LogWarning("\r\n已配置为跳过每日任务");
+                return;
+            }
+
+            _logger.LogInformation("\r\n-----开始每日任务-----\r\n");
 
             UseInfo userInfo;
             DailyTaskInfo dailyTaskInfo;
@@ -67,6 +81,7 @@ namespace Ray.BiliBiliTool.Application
         {
             UseInfo userInfo = _loginDomainService.LoginByCookie();
             if (userInfo == null) throw new Exception("登录失败，请检查Cookie");//终止流程
+
             return userInfo;
         }
 
@@ -95,7 +110,7 @@ namespace Ray.BiliBiliTool.Application
         [TaskInterceptor("投币", false)]
         private void AddCoinsForVideo()
         {
-            _videoDomainService.AddCoinsForVideo();
+            _donateCoinDomainService.AddCoinsForVideo();
         }
 
         /// <summary>
